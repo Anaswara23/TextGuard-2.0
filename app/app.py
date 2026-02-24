@@ -285,13 +285,18 @@ details summary svg,
     background-color: {_accent} !important;
 }}
 
+/* ── Reduce Streamlit default top padding ── */
+.block-container, [data-testid="stMainBlockContainer"] {{
+    padding-top: 1rem !important;
+}}
+
 /* ── Page 1: hero ── */
 .hero {{
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    padding: 5rem 1rem 2.5rem;
+    padding: 2rem 1rem 2.5rem;
 }}
 .hero-wordmark {{
     font-size: 0.78rem;
@@ -302,7 +307,7 @@ details summary svg,
     margin-bottom: 0.75rem;
 }}
 .hero-title {{
-    font-size: 2.4rem;
+    font-size: 3.4rem;
     font-weight: 700;
     color: {_text};
     letter-spacing: -0.8px;
