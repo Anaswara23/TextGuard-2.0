@@ -46,14 +46,21 @@ st.markdown(f"""
 section[data-testid="stSidebar"] {{
     background-color: {_bg2} !important;
 }}
-p, li, div, span, h1, h2, h3, h4, h5, label,
+p, li, div, span, h1, h2, h3, h4, h5, label, strong, b,
 .stMarkdown, .stText {{
     color: {_text} !important;
 }}
 [data-testid="stMetricValue"],
-[data-testid="stMetricLabel"],
-[data-testid="stMetricDelta"] {{
+[data-testid="stMetricLabel"] {{
     color: {_text} !important;
+}}
+[data-testid="stMetricDelta"] {{
+    color: {_muted} !important;
+}}
+[data-testid="stMetricDelta"][data-direction="up"],
+[data-testid="stMetricDelta"][data-direction="down"],
+[data-testid="stMetricDelta"] > div {{
+    color: {_muted} !important;
 }}
 hr {{ border-color: {_border} !important; }}
 
@@ -67,6 +74,103 @@ hr {{ border-color: {_border} !important; }}
 }}
 [data-baseweb="select"] span,
 [data-baseweb="input"] input {{ color: {_text} !important; }}
+
+/* ── File uploader dropzone ── */
+[data-testid="stFileUploadDropzone"],
+[data-testid="stFileUploadDropzone"] > div,
+[data-testid="stFileUploadDropzone"] section,
+[data-testid="stFileUploadDropzone"] button,
+[data-testid="stFileUploaderDropzone"],
+[data-testid="stFileUploaderDropzone"] > div,
+[data-testid="stFileUploaderDropzoneInstructions"],
+[data-testid="stFileUploaderDropzoneInstructions"] > div {{
+    background-color: {_bg2} !important;
+    color: {_text} !important;
+    border-color: {_border} !important;
+}}
+[data-testid="stFileUploadDropzone"] span,
+[data-testid="stFileUploadDropzone"] p,
+[data-testid="stFileUploadDropzone"] small,
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] small,
+[data-testid="stFileUploaderDropzoneInstructions"] p {{
+    color: {_muted} !important;
+}}
+[data-testid="stFileUploadDropzone"] svg,
+[data-testid="stFileUploaderDropzoneInstructions"] svg {{
+    fill: {_muted} !important;
+    stroke: {_muted} !important;
+}}
+/* browse files button inside uploader */
+[data-testid="stFileUploaderDropzone"] button,
+[data-testid="stFileUploaderDropzone"] button span {{
+    background-color: {_bg} !important;
+    color: {_text} !important;
+    border-color: {_border} !important;
+}}
+
+/* ── Selectbox dropdown popup ── */
+[data-baseweb="popover"],
+[data-baseweb="popover"] > div,
+[data-baseweb="menu"],
+[data-baseweb="menu"] > ul,
+[data-baseweb="menu"] ul,
+[data-baseweb="option"],
+[data-baseweb="select"] [role="listbox"],
+[role="listbox"],
+[role="option"],
+ul[data-baseweb="menu"] {{
+    background-color: {_bg} !important;
+    color: {_text} !important;
+    border-color: {_border} !important;
+}}
+[data-baseweb="option"]:hover,
+[role="option"]:hover {{
+    background-color: {_bg2} !important;
+}}
+[data-baseweb="option"] span,
+[data-baseweb="option"] div,
+[role="option"] span,
+[role="option"] div,
+[role="option"] {{
+    color: {_text} !important;
+    background-color: transparent !important;
+}}
+[aria-selected="true"][role="option"] {{
+    background-color: {_bg2} !important;
+}}
+[data-testid="stSelectbox"] [data-baseweb="select"] svg {{
+    fill: {_text} !important;
+}}
+
+/* ── Dropdown portal (BaseWeb appends to body, outside .stApp) ── */
+body > div[data-baseweb="layer"] {{
+    background: transparent !important;
+}}
+body > div[data-baseweb="layer"] > div,
+body > div[data-baseweb="layer"] [data-baseweb="popover"],
+body > div[data-baseweb="layer"] [data-baseweb="menu"],
+body > div[data-baseweb="layer"] ul,
+body > div[data-baseweb="layer"] [role="listbox"] {{
+    background: {_bg} !important;
+    background-color: {_bg} !important;
+    border-color: {_border} !important;
+}}
+body > div[data-baseweb="layer"] li,
+body > div[data-baseweb="layer"] [role="option"] {{
+    background: {_bg} !important;
+    background-color: {_bg} !important;
+    color: {_text} !important;
+}}
+body > div[data-baseweb="layer"] [role="option"]:hover,
+body > div[data-baseweb="layer"] li:hover {{
+    background: {_bg2} !important;
+    background-color: {_bg2} !important;
+}}
+body > div[data-baseweb="layer"] span,
+body > div[data-baseweb="layer"] p {{
+    color: {_text} !important;
+}}
 
 /* ── Buttons ── */
 .stButton > button {{
@@ -102,6 +206,26 @@ hr {{ border-color: {_border} !important; }}
     border-radius: 8px !important;
     padding: 0.85rem 1rem !important;
 }}
+[data-testid="metric-container"] [data-testid="stMetricValue"] {{
+    font-size: 1.05rem !important;
+    white-space: normal !important;
+    word-break: break-word !important;
+    overflow: visible !important;
+    text-overflow: unset !important;
+}}
+
+/* ── Download button ── */
+[data-testid="stDownloadButton"] button {{
+    background-color: {_bg2} !important;
+    border: 1px solid {_border} !important;
+    color: {_text} !important;
+    border-radius: 6px !important;
+    font-size: 0.875rem !important;
+}}
+[data-testid="stDownloadButton"] button:hover {{
+    border-color: {_accent} !important;
+    color: {_accent} !important;
+}}
 
 /* ── Expanders ── */
 [data-testid="stExpander"] {{
@@ -109,7 +233,52 @@ hr {{ border-color: {_border} !important; }}
     border: 1px solid {_border} !important;
     border-radius: 8px !important;
 }}
-details summary {{ color: {_text} !important; }}
+[data-testid="stExpander"] summary,
+[data-testid="stExpander"] > details > summary,
+details > summary {{
+    background-color: {_bg2} !important;
+    color: {_text} !important;
+    fill: {_text} !important;
+}}
+details summary p,
+details summary span,
+details summary svg,
+[data-testid="stExpander"] summary p {{
+    color: {_text} !important;
+    fill: {_text} !important;
+    background-color: transparent !important;
+}}
+
+/* ── Force full width inside expanders ── */
+[data-testid="stExpander"] [data-testid="stVerticalBlock"] {{
+    align-items: stretch !important;
+}}
+[data-testid="stExpander"] [data-testid="element-container"],
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"],
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] > div {{
+    width: 100% !important;
+    max-width: 100% !important;
+    align-self: stretch !important;
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+}}
+
+/* ── Evidence blockquote styling ── */
+[data-testid="stExpander"] blockquote {{
+    border-left: 3px solid {_accent} !important;
+    background: {_bg} !important;
+    padding: 0.75rem 1rem !important;
+    margin: 0.5rem 0 !important;
+    border-radius: 3px !important;
+    font-size: 0.88rem !important;
+    line-height: 1.7 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+}}
+[data-testid="stExpander"] blockquote p,
+[data-testid="stExpander"] blockquote em {{
+    color: {_text} !important;
+}}
 
 /* ── Progress bar ── */
 [data-testid="stProgressBar"] > div > div {{
@@ -226,9 +395,14 @@ details summary {{ color: {_text} !important; }}
     font-weight: 700;
     margin-bottom: 0.5rem;
 }}
-.badge-high   {{ background: #ffebe9; color: #cf222e; }}
-.badge-medium {{ background: #fff8c5; color: #9a6700; }}
-.badge-low    {{ background: #dafbe1; color: #1a7f37; }}
+.badge-high   {{ background: #ffebe9 !important; color: #cf222e !important; }}
+.badge-medium {{ background: #fff8c5 !important; color: #9a6700 !important; }}
+.badge-low    {{ background: #dafbe1 !important; color: #1a7f37 !important; }}
+.badge-high *,
+.badge-medium *,
+.badge-low * {{
+    color: inherit !important;
+}}
 
 /* ── Results page ── */
 .results-back {{
@@ -256,7 +430,25 @@ details summary {{ color: {_text} !important; }}
     font-size: 0.88rem;
     color: {_text};
     margin-top: 0.5rem;
-    line-height: 1.6;
+    line-height: 1.7;
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box;
+    display: block;
+}}
+.evidence-box p {{
+    margin: 0 0 0.6rem 0;
+    color: {_text};
+    width: 100%;
+    max-width: 100%;
+}}
+/* ensure the Streamlit markdown wrapper doesn't constrain width */
+[data-testid="stMarkdownContainer"]:has(.evidence-box) {{
+    width: 100% !important;
+    max-width: 100% !important;
 }}
 
 /* ── Policy chips ── */
@@ -299,6 +491,78 @@ details summary {{ color: {_text} !important; }}
 </style>
 """, unsafe_allow_html=True)
 
+# ── Inject portal CSS directly into page DOM (no iframe) ─────────────────────
+# st.html() injects without a sandbox so it affects BaseWeb portal divs
+# that are appended to document.body outside the React tree.
+st.html(f"""<style>
+body > div[data-baseweb="layer"] > div,
+body > div[data-baseweb="layer"] [data-baseweb="popover"],
+body > div[data-baseweb="layer"] [data-baseweb="menu"],
+body > div[data-baseweb="layer"] ul,
+body > div[data-baseweb="layer"] [role="listbox"] {{
+  background: {_bg} !important;
+  background-color: {_bg} !important;
+  border-color: {_border} !important;
+}}
+body > div[data-baseweb="layer"] li,
+body > div[data-baseweb="layer"] [role="option"] {{
+  background: {_bg} !important;
+  background-color: {_bg} !important;
+  color: {_text} !important;
+}}
+body > div[data-baseweb="layer"] [role="option"]:hover,
+body > div[data-baseweb="layer"] li:hover {{
+  background: {_bg2} !important;
+  background-color: {_bg2} !important;
+}}
+body > div[data-baseweb="layer"] span,
+body > div[data-baseweb="layer"] p {{
+  color: {_text} !important;
+}}
+
+/* ── Expander content full width ── */
+[data-testid="stExpander"] [data-testid="stVerticalBlock"],
+[data-testid="stExpander"] details > div {{
+  align-items: stretch !important;
+  width: 100% !important;
+}}
+[data-testid="stExpander"] [data-testid="element-container"],
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] {{
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+}}
+</style>
+<script>
+(function fixEvidenceWidth() {{
+  var doc;
+  try {{ doc = window.parent.document; }} catch(e) {{ doc = document; }}
+  function applyFix() {{
+    doc.querySelectorAll('[data-testid="stExpander"] [data-testid="stMarkdownContainer"]').forEach(function(el) {{
+      var node = el;
+      for (var i = 0; i < 6; i++) {{
+        if (!node) break;
+        node.style.setProperty('width', '100%', 'important');
+        node.style.setProperty('max-width', '100%', 'important');
+        node.style.setProperty('min-width', '0', 'important');
+        node.style.setProperty('align-self', 'stretch', 'important');
+        node.style.setProperty('box-sizing', 'border-box', 'important');
+        if (node.parentElement && node.parentElement.getAttribute('data-testid') === 'stExpander') break;
+        node = node.parentElement;
+      }}
+    }});
+    doc.querySelectorAll('[data-testid="stExpander"] [data-testid="stVerticalBlock"]').forEach(function(el) {{
+      el.style.setProperty('align-items', 'stretch', 'important');
+      el.style.setProperty('width', '100%', 'important');
+    }});
+  }}
+  applyFix();
+  try {{ new MutationObserver(applyFix).observe(doc.body, {{subtree: true, childList: true}}); }} catch(e) {{}}
+}})();
+</script>""")
+
 # ── Config ─────────────────────────────────────────────────────────────────────
 try:
     API_URL = st.secrets["app"]["API_URL"]
@@ -328,6 +592,57 @@ SECTOR_OPTIONS = {
 
 
 # ── PDF highlight helper ───────────────────────────────────────────────────────
+def _clean_evidence(text: str) -> str:
+    """Normalize PDF-extracted text, remove non-substantive lines, replace tables."""
+    import re
+    text = text.strip().strip('"').strip("'")
+    # Normalize 3+ newlines to a double newline (paragraph separator)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    # Collapse multiple spaces/tabs on the same line (but not newlines)
+    text = re.sub(r'[ \t]{2,}', ' ', text)
+
+    # Detect and replace table-like paragraphs
+    def _is_table(p: str) -> bool:
+        lines = [l for l in p.split('\n') if l.strip()]
+        if not lines:
+            return False
+        # Table indicator: majority of lines have 2+ pipe chars
+        pipe_lines = sum(1 for l in lines if l.count('|') >= 2)
+        if pipe_lines >= max(2, len(lines) * 0.5):
+            return True
+        # OR: majority of lines are very short (< 25 chars) — column data rows
+        short_lines = sum(1 for l in lines if len(l.strip()) < 25)
+        if len(lines) >= 4 and short_lines >= len(lines) * 0.7:
+            return True
+        return False
+
+    def _keep_para(p: str) -> bool:
+        p = p.strip()
+        if not p:
+            return False
+        if re.match(r'^[\dIVXivx]+(\.[\dIVXivx]+)*\.?$', p):
+            return False
+        if re.match(r'^[a-zA-Z]\)$', p):
+            return False
+        if len(p) < 40 and not re.search(r'[.!?:,]', p):
+            return False
+        return True
+
+    paras = text.split('\n\n')
+    result_paras = []
+    for p in paras:
+        if not p.strip():
+            continue
+        if _is_table(p):
+            result_paras.append('[TABLE — check document for full table]')
+        elif _keep_para(p):
+            # Within paragraph, filter non-substantive lines
+            kept = [l for l in p.split('\n') if _keep_para(l)]
+            if kept:
+                result_paras.append('\n'.join(kept))
+    return '\n\n'.join(result_paras).strip()
+
+
 def render_highlighted_pdf(pdf_bytes: bytes, sections: list) -> list:
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     highlights = []
@@ -346,6 +661,32 @@ def render_highlighted_pdf(pdf_bytes: bytes, sections: list) -> list:
                 annot.update()
     mat = fitz.Matrix(1.5, 1.5)
     imgs = [p.get_pixmap(matrix=mat, alpha=False).tobytes("png") for p in doc]
+    doc.close()
+    return imgs
+
+
+def render_section_pdf(pdf_bytes: bytes, section: dict) -> list:
+    """Render only the PDF pages where this section's evidence appears, highlighted."""
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    evidence = section.get("evidence", "").strip().strip('"').strip("'")
+    snippet = evidence[:70] if evidence else ""
+    color = (1.0, 0.22, 0.22) if section["risk_score"] > 70 else (1.0, 0.82, 0.1)
+    hit_pages = set()
+    for i, page in enumerate(doc):
+        if snippet and page.search_for(snippet):
+            hit_pages.add(i)
+    if not hit_pages:  # fallback: return first page
+        hit_pages.add(0)
+    for i in hit_pages:
+        page = doc[i]
+        for rect in page.search_for(snippet):
+            annot = page.add_highlight_annot(rect)
+            annot.set_colors(stroke=color)
+            annot.update()
+    mat = fitz.Matrix(1.8, 1.8)
+    imgs = []
+    for i in sorted(hit_pages):
+        imgs.append(doc[i].get_pixmap(matrix=mat, alpha=False).tobytes("png"))
     doc.close()
     return imgs
 
@@ -553,7 +894,8 @@ elif st.session_state.page == "results":
             "Sections Flagged",
             f"{data['sections_flagged']} / {data['sections_analyzed']}",
         )
-        mc4.metric("Sector", sector_display or "—")
+        sector_short = (sector_display[:22] + "…") if sector_display and len(sector_display) > 22 else (sector_display or "—")
+        mc4.metric("Sector", sector_short)
 
         st.markdown("<div style='margin-top:1rem'></div>", unsafe_allow_html=True)
 
@@ -618,10 +960,49 @@ elif st.session_state.page == "results":
                     f"{s['section']}  —  {s['risk_score']}% risk  |  {s['compliance']}"
                 ):
                     st.markdown("**Key Evidence** *(highest-attention chunk)*")
-                    st.markdown(
-                        f'<div class="evidence-box">"{s["evidence"]}"</div>',
-                        unsafe_allow_html=True,
-                    )
+                    cleaned = _clean_evidence(s["evidence"])
+                    paras = cleaned.split("\n\n")
+                    # Blockquote: escape markdown special chars to prevent garbled rendering
+                    def _escape_md(line: str) -> str:
+                        import re
+                        # escape markdown special chars: * _ ` [ ] ( ) # + - . !
+                        return re.sub(r'([\*\_\`\[\]\(\)\#\+\-\.\!])', r'\\\1', line)
+                    bq_lines = []
+                    for para in paras:
+                        if para.strip():
+                            for line in para.strip().split("\n"):
+                                if line.strip():
+                                    bq_lines.append(f"> {_escape_md(line.strip())}")
+                            bq_lines.append(">")
+                    st.markdown("\n".join(bq_lines))
+
+                    # View in Document button
+                    vid_key = f"vid_{s['section']}"
+                    if vid_key not in st.session_state:
+                        st.session_state[vid_key] = False
+                    if st.button(
+                        "Hide Document View" if st.session_state[vid_key] else "View in Document",
+                        key=f"vidbtn_{s['section']}",
+                    ):
+                        st.session_state[vid_key] = not st.session_state[vid_key]
+                        st.rerun()
+                    if st.session_state.get(vid_key):
+                        pdf_bytes_local = active_hist.get("pdf_bytes") if active_hist else None
+                        if pdf_bytes_local:
+                            with st.spinner("Loading pages..."):
+                                sec_pages = render_section_pdf(pdf_bytes_local, s)
+                            swatch_color = "rgba(207,34,46,0.55)" if s["risk_score"] > 70 else "rgba(255,210,25,0.8)"
+                            st.markdown(
+                                f'<span style="display:inline-block;width:12px;height:12px;'
+                                f'background:{swatch_color};border-radius:2px;margin-right:6px;vertical-align:middle"></span>'
+                                f'<span style="font-size:0.8rem;color:{_muted}">Highlighted passage — {len(sec_pages)} page(s) shown</span>',
+                                unsafe_allow_html=True,
+                            )
+                            for pg_img in sec_pages:
+                                st.image(pg_img, use_container_width=True)
+                        else:
+                            st.info("Re-upload the document to enable the document viewer.")
+
                     sec_labels = s.get("policy_labels", [])
                     if sec_labels:
                         st.markdown("**Policy Risk Labels**")
