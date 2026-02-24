@@ -68,6 +68,15 @@ if uploaded:
             st.stop()
     
     st.success(f"Analysis complete — {data['sections_analyzed']} sections analyzed")
+
+    sector_display = data.get('sector_display', '')
+    if sector_display:
+        st.markdown(
+            f'<span style="background:#1e4d8c;color:#fff;padding:5px 14px;'
+            f'border-radius:14px;font-size:0.85rem;font-weight:600;display:inline-block;'
+            f'margin-bottom:0.5rem">🏷️ Detected Sector: {sector_display}</span>',
+            unsafe_allow_html=True
+        )
     st.divider()
     
     col1, col2, col3, col4 = st.columns(4)
@@ -103,9 +112,16 @@ if uploaded:
                           paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
         
-        st.markdown("**Policy Areas Detected:**")
-        for policy in data.get('policy_categories', []):
-            st.markdown(f"• {policy}")
+        policy_labels = data.get('policy_labels', [])
+        if policy_labels:
+            st.markdown("**Policy Risk Labels:**")
+            tags_html = " ".join(
+                f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 10px;'
+                f'border-radius:10px;font-size:0.8rem;margin:2px;display:inline-block">'
+                f'{lbl}</span>'
+                for lbl in policy_labels
+            )
+            st.markdown(tags_html, unsafe_allow_html=True)
     
     with col_breakdown:
         st.subheader("Section Risk Breakdown")
@@ -124,7 +140,18 @@ if uploaded:
             with st.expander(f"**{s['section']}** — {s['risk_score']}% risk | {s['compliance']}"):
                 st.markdown("**Key Evidence** *(highest-attention chunk)*:")
                 st.markdown(f'<div class="evidence-box">"{s["evidence"]}"</div>', unsafe_allow_html=True)
-                
+
+                section_labels = s.get('policy_labels', [])
+                if section_labels:
+                    st.markdown("**Policy Risk Labels:**")
+                    tags_html = " ".join(
+                        f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 10px;'
+                        f'border-radius:10px;font-size:0.8rem;margin:2px;display:inline-block">'
+                        f'{lbl}</span>'
+                        for lbl in section_labels
+                    )
+                    st.markdown(tags_html, unsafe_allow_html=True)
+
                 if len(s['attention_weights']) > 1:
                     weights_df = pd.DataFrame({
                         'Chunk': [f"Chunk {i}" for i in range(len(s['attention_weights']))],
