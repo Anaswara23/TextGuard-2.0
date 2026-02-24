@@ -1,7 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
 import requests
-import pandas as pd
 import json
 import os
 from datetime import datetime
@@ -15,39 +14,77 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-[data-testid="stAppViewContainer"] { background: #0d1117; }
-[data-testid="stHeader"] { background: transparent; }
+/* ── Adaptive hero ─────────────────────────────────────────── */
 .hero-title {
-    font-size: 2.6rem; font-weight: 800; color: #ffffff;
+    font-size: 2.6rem; font-weight: 800;
+    color: var(--text-color);
     text-align: center; margin-top: 2rem; margin-bottom: 0.3rem;
 }
-.hero-sub { font-size: 1rem; color: #8b949e; text-align: center; margin-bottom: 2rem; }
+.hero-sub {
+    font-size: 1rem; color: var(--text-color); opacity: 0.6;
+    text-align: center; margin-bottom: 2rem;
+}
 .section-header {
-    font-size: 1.1rem; font-weight: 600; color: #c9d1d9;
-    margin-bottom: 0.8rem; margin-top: 0.5rem;
+    font-size: 1.05rem; font-weight: 600; color: var(--text-color);
+    opacity: 0.85; margin-bottom: 0.8rem; margin-top: 0.5rem;
+    border-bottom: 1px solid rgba(128,128,128,0.2); padding-bottom: 0.4rem;
 }
+
+/* ── Document history cards ────────────────────────────────── */
 .doc-card {
-    background: #161b22; border: 1px solid #30363d;
-    border-radius: 10px; padding: 1rem 1.1rem 0.9rem;
+    background: var(--secondary-background-color);
+    border: 1px solid rgba(128,128,128,0.2);
+    border-radius: 12px; padding: 1rem 1.1rem 0.9rem;
+    transition: box-shadow 0.2s;
 }
+.doc-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
 .doc-card-title {
-    font-size: 0.82rem; font-weight: 600; color: #e6edf3;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 0.2rem;
+    font-size: 0.82rem; font-weight: 600; color: var(--text-color);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    margin-bottom: 0.2rem;
 }
-.doc-card-date { font-size: 0.72rem; color: #8b949e; margin-bottom: 0.6rem; }
+.doc-card-date {
+    font-size: 0.72rem; color: var(--text-color); opacity: 0.5;
+    margin-bottom: 0.6rem;
+}
 .doc-card-stats { display: flex; gap: 1.2rem; margin-top: 0.6rem; }
-.stat-item { font-size: 0.73rem; color: #8b949e; }
-.stat-val  { font-size: 1rem; font-weight: 700; }
-.stat-risk  { color: #f85149; }
-.stat-ok    { color: #3fb950; }
-.stat-score { color: #d29922; }
-.risk-badge-high   { background:#3d1212; color:#f85149; border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
-.risk-badge-medium { background:#3d2e00; color:#d29922; border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
-.risk-badge-low    { background:#0d3321; color:#3fb950; border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
+.stat-item { font-size: 0.73rem; color: var(--text-color); opacity: 0.65; }
+.stat-val  { font-size: 1rem; font-weight: 700; opacity: 1; color: var(--text-color); }
+.stat-risk  { color: #e53e3e !important; }
+.stat-ok    { color: #38a169 !important; }
+.stat-score { color: #d69e2e !important; }
+
+/* ── Risk badges (work in both modes) ─────────────────────── */
+.risk-badge-high {
+    background: #fed7d7; color: #c53030;
+    border-radius: 6px; padding: 2px 9px;
+    font-size: 0.72rem; font-weight: 700;
+}
+.risk-badge-medium {
+    background: #fefcbf; color: #975a16;
+    border-radius: 6px; padding: 2px 9px;
+    font-size: 0.72rem; font-weight: 700;
+}
+.risk-badge-low {
+    background: #c6f6d5; color: #276749;
+    border-radius: 6px; padding: 2px 9px;
+    font-size: 0.72rem; font-weight: 700;
+}
+
+/* ── Evidence box ──────────────────────────────────────────── */
 .evidence-box {
-    background: #1e2a3a; border-left: 3px solid #4a90d9; border-radius: 4px;
+    background: var(--secondary-background-color);
+    border-left: 3px solid #4a90d9; border-radius: 4px;
     padding: 0.8rem 1rem; font-style: italic; font-size: 0.9rem;
-    color: #d0e4f7; margin-top: 0.5rem; line-height: 1.5;
+    color: var(--text-color); margin-top: 0.5rem; line-height: 1.5;
+}
+
+/* ── Policy label chips ────────────────────────────────────── */
+.label-chip {
+    background: rgba(74,144,217,0.15); color: #4a90d9;
+    border: 1px solid rgba(74,144,217,0.3);
+    padding: 3px 10px; border-radius: 20px;
+    font-size: 0.76rem; margin: 2px; display: inline-block;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -218,24 +255,23 @@ if data:
                 "axis": {"range": [0, 100]},
                 "bar": {"color": gauge_color},
                 "steps": [
-                    {"range": [0, 40],   "color": "#0d3321"},
-                    {"range": [40, 70],  "color": "#3d2e00"},
-                    {"range": [70, 100], "color": "#3d1212"},
+                    {"range": [0, 40],   "color": "rgba(56,161,105,0.15)"},
+                    {"range": [40, 70],  "color": "rgba(214,158,46,0.15)"},
+                    {"range": [70, 100], "color": "rgba(229,62,62,0.15)"},
                 ],
+                "bgcolor": "rgba(0,0,0,0)",
             }
         ))
-        fig.update_layout(height=260, margin=dict(t=40, b=10, l=20, r=20),
-                          template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)")
+        fig.update_layout(
+            height=260, margin=dict(t=40, b=10, l=20, r=20),
+            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+        )
         st.plotly_chart(fig, use_container_width=True)
 
         policy_labels = data.get("policy_labels", [])
         if policy_labels:
             st.markdown("**Policy Risk Labels:**")
-            tags = " ".join(
-                f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 9px;'
-                f'border-radius:8px;font-size:0.78rem;margin:2px;display:inline-block">{lbl}</span>'
-                for lbl in policy_labels
-            )
+            tags = " ".join(f'<span class="label-chip">{lbl}</span>' for lbl in policy_labels)
             st.markdown(tags, unsafe_allow_html=True)
 
     with col_breakdown:
@@ -257,11 +293,7 @@ if data:
                 section_labels = s.get("policy_labels", [])
                 if section_labels:
                     st.markdown("**Policy Risk Labels:**")
-                    tags = " ".join(
-                        f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 9px;'
-                        f'border-radius:8px;font-size:0.78rem;margin:2px;display:inline-block">{lbl}</span>'
-                        for lbl in section_labels
-                    )
+                    tags = " ".join(f'<span class="label-chip">{lbl}</span>' for lbl in section_labels)
                     st.markdown(tags, unsafe_allow_html=True)
 
                 if len(s["attention_weights"]) > 1:
@@ -276,9 +308,9 @@ if data:
                     ))
                     fig_attn.update_layout(
                         title="Chunk Attention Weights", height=220,
-                        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
+                        paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        margin=dict(t=35, b=15, l=15, r=15), font=dict(color="#ccc")
+                        margin=dict(t=35, b=15, l=15, r=15)
                     )
                     st.plotly_chart(fig_attn, use_container_width=True)
     else:
