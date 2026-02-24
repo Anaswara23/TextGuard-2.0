@@ -4,6 +4,7 @@ import requests
 import json
 import os
 from datetime import datetime
+import fitz  # PyMuPDF
 
 st.set_page_config(
     page_title="TextGuard 2.0",
@@ -86,8 +87,49 @@ st.markdown("""
     padding: 3px 10px; border-radius: 20px;
     font-size: 0.76rem; margin: 2px; display: inline-block;
 }
+.pdf-legend {
+    display:flex; gap:1.4rem; align-items:center;
+    font-size:0.83rem; color:var(--text-color); margin-bottom:0.8rem;
+}
+.legend-swatch {
+    width:14px; height:14px; border-radius:3px;
+    display:inline-block; margin-right:5px; vertical-align:middle;
+}
 </style>
 """, unsafe_allow_html=True)
+
+# ── Dark-mode override (injected only when toggled on) ─────────────────────────
+if st.session_state.get("dark_mode", False):
+    st.markdown("""
+    <style>
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"],
+    [data-testid="stHeader"] { background-color: #0d1117 !important; }
+    section[data-testid="stSidebar"] { background-color: #161b22 !important; }
+    p, li, span, label, div, h1, h2, h3, h4, h5,
+    .stMarkdown,
+    [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
+    [data-testid="stMetricDelta"],
+    .stTabs [data-baseweb="tab"] { color: #e6edf3 !important; }
+    [data-testid="metric-container"] {
+        background: #161b22 !important; border-color: #30363d !important;
+    }
+    .stButton > button {
+        border-color: #30363d !important; color: #e6edf3 !important;
+        background: #161b22 !important;
+    }
+    hr { border-color: #30363d !important; }
+    [data-testid="stTabs"] [data-baseweb="tab-list"] {
+        background: #0d1117 !important; border-color: #30363d !important;
+    }
+    [data-baseweb="select"] div, [data-testid="stFileUploader"] {
+        background: #161b22 !important;
+        border-color: #30363d !important;
+        color: #e6edf3 !important;
+    }
+    details summary { color: #e6edf3 !important; }
+    [data-testid="stExpander"] { border-color: #30363d !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 try:
@@ -117,12 +159,57 @@ SECTOR_OPTIONS = {
 }
 
 # ── Session state ──────────────────────────────────────────────────────────────
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "active_result" not in st.session_state:
-    st.session_state.active_result = None
-if "active_filename" not in st.session_state:
-    st.session_state.active_filename = None
+for _key, _default in [
+    ("history", []),
+    ("active_result", None),
+    ("active_filename", None),
+    ("dark_mode", False),
+]:
+    if _key not in st.session_state:
+        st.session_state[_key] = _default
+
+# ── PDF highlight helper ───────────────────────────────────────────────────────
+def render_highlighted_pdf(pdf_bytes: bytes, sections: list) -> list:
+    """
+    Search each risky section's evidence snippet in the PDF and highlight it.
+    Red  = high risk (>70%)  |  Yellow = medium risk (40-70%)
+    Returns a list of PNG image bytes, one per page.
+    """
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+
+    highlights = []
+    for s in sections:
+        if s["risk_score"] > 40:
+            evidence = s.get("evidence", "").strip().strip('"').strip("'")
+            if not evidence:
+                continue
+            snippet = evidence[:70]   # first 70 chars — enough to locate the passage
+            color = (1.0, 0.22, 0.22) if s["risk_score"] > 70 else (1.0, 0.82, 0.1)
+            highlights.append((snippet, color))
+
+    for page in doc:
+        for snippet, color in highlights:
+            for rect in page.search_for(snippet):
+                annot = page.add_highlight_annot(rect)
+                annot.set_colors(stroke=color)
+                annot.update()
+
+    mat = fitz.Matrix(1.5, 1.5)
+    page_images = []
+    for page in doc:
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        page_images.append(pix.tobytes("png"))
+
+    doc.close()
+    return page_images
+
+# ── Theme toggle ───────────────────────────────────────────────────────────────
+_top_left, _top_right = st.columns([12, 1])
+with _top_right:
+    _icon = "☀️" if st.session_state.dark_mode else "🌙"
+    if st.button(_icon, help="Toggle light / dark mode", use_container_width=True):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
 
 # ── Hero ───────────────────────────────────────────────────────────────────────
 st.markdown('<div class="hero-title">🛡️ TextGuard 2.0</div>', unsafe_allow_html=True)
@@ -170,6 +257,7 @@ if uploaded and analyze_clicked:
         "filename": uploaded.name,
         "date": datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p"),
         "data": data,
+        "pdf_bytes": pdf_bytes,
     })
     st.session_state.active_result = data
     st.session_state.active_filename = uploaded.name
@@ -190,7 +278,7 @@ if st.session_state.history:
             badge_cls = "risk-badge-high" if risk > 70 else "risk-badge-medium" if risk > 40 else "risk-badge-low"
             badge_lbl = "High Risk" if risk > 70 else "Medium Risk" if risk > 40 else "Low Risk"
             fname_short = entry["filename"][:26] + "…" if len(entry["filename"]) > 26 else entry["filename"]
-            active_border = "#58a6ff" if entry["filename"] == st.session_state.active_filename else "#30363d"
+            active_border = "#58a6ff" if entry["filename"] == st.session_state.active_filename else "rgba(128,128,128,0.2)"
 
             with col:
                 st.markdown(f"""
@@ -213,113 +301,182 @@ if st.session_state.history:
 # ── Result detail ──────────────────────────────────────────────────────────────
 data = st.session_state.active_result
 filename = st.session_state.active_filename
+active_history = next(
+    (h for h in st.session_state.history if h.get("filename") == filename), None
+)
 
 if data:
     st.divider()
-    risk = data["overall_risk"]
+    tab_analysis, tab_pdf = st.tabs(["📊 Analysis", "📄 Highlighted PDF"])
 
-    hcol1, hcol2 = st.columns([5, 1])
-    with hcol1:
-        st.subheader(f"📄 {filename}")
-        sector_display = data.get("sector_display", "")
-        if sector_display:
-            prefix = "Detected Sector" if data.get("sector_source") == "detected" else "Sector"
-            st.badge(f"🏷️ {prefix}: {sector_display}", color="blue")
-    with hcol2:
-        st.download_button(
-            "📥 Download Report",
-            data=json.dumps(data, indent=2),
-            file_name=f"textguard_{filename.replace('.pdf','')}.json",
-            mime="application/json",
-            use_container_width=True,
+    # ╔══════════════════════════════════════════════╗
+    # ║  Tab 1 — Analysis                           ║
+    # ╚══════════════════════════════════════════════╝
+    with tab_analysis:
+        risk = data["overall_risk"]
+
+        hcol1, hcol2 = st.columns([5, 1])
+        with hcol1:
+            st.subheader(f"📄 {filename}")
+            sector_display = data.get("sector_display", "")
+            if sector_display:
+                prefix = "Detected Sector" if data.get("sector_source") == "detected" else "Sector"
+                st.badge(f"🏷️ {prefix}: {sector_display}", color="blue")
+        with hcol2:
+            st.download_button(
+                "📥 Download Report",
+                data=json.dumps(data, indent=2),
+                file_name=f"textguard_{filename.replace('.pdf', '')}.json",
+                mime="application/json",
+                use_container_width=True,
+            )
+
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        mc1.metric(
+            "Overall Risk Score", f"{risk}%",
+            "High Risk" if risk > 70 else "Medium Risk" if risk > 40 else "Low Risk"
         )
+        mc2.metric("Compliance Status", data["overall_compliance"])
+        mc3.metric("Sections Flagged", f"{data['sections_flagged']} / {data['sections_analyzed']}")
+        mc4.metric("Sector", sector_display or "—")
 
-    mc1, mc2, mc3, mc4 = st.columns(4)
-    mc1.metric("Overall Risk Score", f"{risk}%",
-               "High Risk" if risk > 70 else "Medium Risk" if risk > 40 else "Low Risk")
-    mc2.metric("Compliance Status", data["overall_compliance"])
-    mc3.metric("Sections Flagged", f"{data['sections_flagged']} / {data['sections_analyzed']}")
-    mc4.metric("Sector", sector_display or "—")
+        st.divider()
+        col_gauge, col_breakdown = st.columns([1, 2])
 
-    st.divider()
-    col_gauge, col_breakdown = st.columns([1, 2])
+        with col_gauge:
+            gauge_color = "crimson" if risk > 70 else "orange" if risk > 40 else "green"
+            fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=risk,
+                title={"text": "Document Risk Score", "font": {"size": 13}},
+                number={"suffix": "%"},
+                gauge={
+                    "axis": {"range": [0, 100]},
+                    "bar": {"color": gauge_color},
+                    "steps": [
+                        {"range": [0, 40],   "color": "rgba(56,161,105,0.15)"},
+                        {"range": [40, 70],  "color": "rgba(214,158,46,0.15)"},
+                        {"range": [70, 100], "color": "rgba(229,62,62,0.15)"},
+                    ],
+                    "bgcolor": "rgba(0,0,0,0)",
+                }
+            ))
+            fig.update_layout(
+                height=260, margin=dict(t=40, b=10, l=20, r=20),
+                paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
-    with col_gauge:
-        gauge_color = "crimson" if risk > 70 else "orange" if risk > 40 else "green"
-        fig = go.Figure(go.Indicator(
-            mode="gauge+number",
-            value=risk,
-            title={"text": "Document Risk Score", "font": {"size": 13}},
-            number={"suffix": "%"},
-            gauge={
-                "axis": {"range": [0, 100]},
-                "bar": {"color": gauge_color},
-                "steps": [
-                    {"range": [0, 40],   "color": "rgba(56,161,105,0.15)"},
-                    {"range": [40, 70],  "color": "rgba(214,158,46,0.15)"},
-                    {"range": [70, 100], "color": "rgba(229,62,62,0.15)"},
-                ],
-                "bgcolor": "rgba(0,0,0,0)",
-            }
-        ))
-        fig.update_layout(
-            height=260, margin=dict(t=40, b=10, l=20, r=20),
-            paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+            policy_labels = data.get("policy_labels", [])
+            if policy_labels:
+                st.markdown("**Policy Risk Labels:**")
+                tags = " ".join(
+                    f'<span class="label-chip">{lbl}</span>' for lbl in policy_labels
+                )
+                st.markdown(tags, unsafe_allow_html=True)
 
-        policy_labels = data.get("policy_labels", [])
-        if policy_labels:
-            st.markdown("**Policy Risk Labels:**")
-            tags = " ".join(f'<span class="label-chip">{lbl}</span>' for lbl in policy_labels)
-            st.markdown(tags, unsafe_allow_html=True)
+        with col_breakdown:
+            st.subheader("Section Risk Breakdown")
+            for s in sorted(data["sections"], key=lambda x: -x["risk_score"]):
+                icon = "🔴" if s["risk_score"] > 70 else "🟡" if s["risk_score"] > 40 else "🟢"
+                st.markdown(f"{icon} **{s['section']}** — {s['risk_score']}% | {s['compliance']}")
+                st.progress(s["risk_score"] / 100)
 
-    with col_breakdown:
-        st.subheader("Section Risk Breakdown")
-        for s in sorted(data["sections"], key=lambda x: -x["risk_score"]):
-            icon = "🔴" if s["risk_score"] > 70 else "🟡" if s["risk_score"] > 40 else "🟢"
-            st.markdown(f"{icon} **{s['section']}** — {s['risk_score']}% | {s['compliance']}")
-            st.progress(s["risk_score"] / 100)
-
-    st.divider()
-    flagged = [s for s in data["sections"] if s["risk_score"] > 40]
-    if flagged:
-        st.subheader(f"⚠️ Flagged Sections ({len(flagged)})")
-        for s in sorted(flagged, key=lambda x: -x["risk_score"]):
-            with st.expander(f"**{s['section']}** — {s['risk_score']}% risk | {s['compliance']}"):
-                st.markdown("**Key Evidence** *(highest-attention chunk)*:")
-                st.markdown(f'<div class="evidence-box">"{s["evidence"]}"</div>', unsafe_allow_html=True)
-
-                section_labels = s.get("policy_labels", [])
-                if section_labels:
-                    st.markdown("**Policy Risk Labels:**")
-                    tags = " ".join(f'<span class="label-chip">{lbl}</span>' for lbl in section_labels)
-                    st.markdown(tags, unsafe_allow_html=True)
-
-                if len(s["attention_weights"]) > 1:
-                    fig_attn = go.Figure(go.Bar(
-                        x=[f"Chunk {i}" for i in range(len(s["attention_weights"]))],
-                        y=s["attention_weights"],
-                        marker_color=[
-                            "#e74c3c" if w == max(s["attention_weights"]) else "#4a90d9"
-                            for w in s["attention_weights"]
-                        ],
-                        hovertemplate="%{x}: %{y:.4f}<extra></extra>"
-                    ))
-                    fig_attn.update_layout(
-                        title="Chunk Attention Weights", height=220,
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        margin=dict(t=35, b=15, l=15, r=15)
+        st.divider()
+        flagged = [s for s in data["sections"] if s["risk_score"] > 40]
+        if flagged:
+            st.subheader(f"⚠️ Flagged Sections ({len(flagged)})")
+            for s in sorted(flagged, key=lambda x: -x["risk_score"]):
+                with st.expander(
+                    f"**{s['section']}** — {s['risk_score']}% risk | {s['compliance']}"
+                ):
+                    st.markdown("**Key Evidence** *(highest-attention chunk)*:")
+                    st.markdown(
+                        f'<div class="evidence-box">"{s["evidence"]}"</div>',
+                        unsafe_allow_html=True
                     )
-                    st.plotly_chart(fig_attn, use_container_width=True)
-    else:
-        st.success("✅ No high-risk sections detected.")
+
+                    section_labels = s.get("policy_labels", [])
+                    if section_labels:
+                        st.markdown("**Policy Risk Labels:**")
+                        tags = " ".join(
+                            f'<span class="label-chip">{lbl}</span>'
+                            for lbl in section_labels
+                        )
+                        st.markdown(tags, unsafe_allow_html=True)
+
+                    if len(s["attention_weights"]) > 1:
+                        fig_attn = go.Figure(go.Bar(
+                            x=[f"Chunk {i}" for i in range(len(s["attention_weights"]))],
+                            y=s["attention_weights"],
+                            marker_color=[
+                                "#e74c3c" if w == max(s["attention_weights"]) else "#4a90d9"
+                                for w in s["attention_weights"]
+                            ],
+                            hovertemplate="%{x}: %{y:.4f}<extra></extra>"
+                        ))
+                        fig_attn.update_layout(
+                            title="Chunk Attention Weights", height=220,
+                            paper_bgcolor="rgba(0,0,0,0)",
+                            plot_bgcolor="rgba(0,0,0,0)",
+                            margin=dict(t=35, b=15, l=15, r=15),
+                        )
+                        st.plotly_chart(fig_attn, use_container_width=True)
+        else:
+            st.success("✅ No high-risk sections detected.")
+
+    # ╔══════════════════════════════════════════════╗
+    # ║  Tab 2 — Highlighted PDF viewer             ║
+    # ╚══════════════════════════════════════════════╝
+    with tab_pdf:
+        pdf_bytes = active_history.get("pdf_bytes") if active_history else None
+
+        if not pdf_bytes:
+            st.info(
+                "PDF not available for this result. "
+                "Re-upload the document to enable the highlighted viewer."
+            )
+        else:
+            flagged_secs = [s for s in data["sections"] if s["risk_score"] > 40]
+            if not flagged_secs:
+                st.success("✅ No risky sections — nothing to highlight.")
+            else:
+                st.markdown("""
+                <div class="pdf-legend">
+                    <span>
+                        <span class="legend-swatch"
+                              style="background:rgba(255,56,56,0.55)"></span>
+                        High risk (&gt;70%)
+                    </span>
+                    <span>
+                        <span class="legend-swatch"
+                              style="background:rgba(255,210,25,0.75)"></span>
+                        Medium risk (40–70%)
+                    </span>
+                    <span style="opacity:0.55; font-size:0.77rem;">
+                        Highlighted = highest-attention evidence chunk per section
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+
+                with st.spinner("Rendering highlighted PDF…"):
+                    page_images = render_highlighted_pdf(pdf_bytes, data["sections"])
+
+                st.caption(
+                    f"{len(page_images)} page(s) · "
+                    f"{len(flagged_secs)} section(s) flagged · "
+                    "scroll to review all highlighted passages"
+                )
+                for i, img_bytes in enumerate(page_images):
+                    st.image(img_bytes, use_container_width=True, caption=f"Page {i + 1}")
 
 else:
     st.markdown("""
-    <div style="text-align:center;padding:3rem 0;color:#8b949e">
+    <div style="text-align:center; padding:3rem 0; color:#8b949e">
         <div style="font-size:2.5rem">📂</div>
-        <div style="margin-top:0.5rem">Upload a document and click <strong>Analyze →</strong> to get started</div>
+        <div style="margin-top:0.5rem">
+            Upload a document and click <strong>Analyze →</strong> to get started
+        </div>
     </div>
     """, unsafe_allow_html=True)
+
