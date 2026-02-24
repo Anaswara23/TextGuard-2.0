@@ -1,0 +1,21 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+nohup.out
+
+# Model weights — upload separately to Render disk / HuggingFace Hub
+models/weights/*.pt
+
+# Don't commit large data files
+data/chunks_with_splits.csv
+data/chunks_all_docs_labeled_clean.csv
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Results (regenerate)
+results/*.png
+results/*.txt
+results/*.csv
