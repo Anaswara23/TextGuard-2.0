@@ -26,7 +26,14 @@ app.add_middleware(
 tokenizer = DistilBertTokenizer.from_pretrained('distilbert-base-uncased')
 
 weights_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                            'models', 'weights', 'hanc_compliance.pt')
+                            'models', 'weights', 'hanc_risk.pt')
+
+# Fall back to old compliance weights if risk model not trained yet
+if not os.path.exists(weights_path):
+    _fallback = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             'models', 'weights', 'hanc_compliance.pt')
+    if os.path.exists(_fallback):
+        weights_path = _fallback
 
 _model = None
 

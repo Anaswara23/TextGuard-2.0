@@ -11,10 +11,10 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.han_c import HANC
 from models.focal_loss import FocalLoss
-from models.dataset import IDBDocumentDataset
+from models.dataset import IDBSectionDataset
 
 # ── Config (can be overridden by run_ablation.py via env vars) ──
-TASK          = 'compliance'
+TASK          = 'risk'
 MODEL_NAME    = 'distilbert-base-uncased'
 USE_ATTENTION = bool(int(os.environ.get('ABLATION_USE_ATTENTION', '1')))
 USE_FOCAL     = bool(int(os.environ.get('ABLATION_USE_FOCAL',     '1')))
@@ -22,12 +22,11 @@ ABLATION_NAME = os.environ.get('ABLATION_NAME', 'han_c_full')
 LR            = 2e-5
 EPOCHS        = 13
 FREEZE_EPOCHS = 3
-PATIENCE      = 4   # early stopping — stop if val F1 doesn't improve for 4 epochs
+PATIENCE      = 4
 DEVICE        = 'cuda' if torch.cuda.is_available() else ('mps' if torch.backends.mps.is_available() else 'cpu')
-# Derive save path from variant name so each ablation saves its own weights
-_weight_name  = {'han_c_full': f'hanc_{TASK}.pt',
-                 'han_no_attn': 'han_no_attn.pt',
-                 'han_cross_entropy': 'han_cross_entropy.pt'}.get(ABLATION_NAME, f'{ABLATION_NAME}.pt')
+_weight_name  = {'han_c_full': 'hanc_risk.pt',
+                 'han_no_attn': 'han_no_attn_risk.pt',
+                 'han_cross_entropy': 'han_cross_entropy_risk.pt'}.get(ABLATION_NAME, f'{ABLATION_NAME}.pt')
 SAVE_PATH     = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                               'models', 'weights', _weight_name)
 RESULTS       = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'results')
@@ -36,8 +35,8 @@ print(f"Device: {DEVICE}")
 print(f"Task: {TASK} | Attention: {USE_ATTENTION} | Focal: {USE_FOCAL}")
 
 # ── Data ──
-data_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
-                         'data', 'chunks_with_splits.csv')
+data_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                         'data', 'chunks_risk_only_slim_with_bbox_v1.csv')
 df = pd.read_csv(data_path)
 tokenizer = DistilBertTokenizer.from_pretrained(MODEL_NAME)
 
@@ -49,9 +48,14 @@ print(f"Train docs: {train_df['document_id'].nunique()} | "
       f"Val docs: {val_df['document_id'].nunique()} | "
       f"Test docs: {test_df['document_id'].nunique()}")
 
-train_dataset = IDBDocumentDataset(train_df, tokenizer, task=TASK)
-val_dataset   = IDBDocumentDataset(val_df,   tokenizer, task=TASK)
-test_dataset  = IDBDocumentDataset(test_df,  tokenizer, task=TASK)
+train_dataset = IDBSectionDataset(train_df, tokenizer)
+val_dataset   = IDBSectionDataset(val_df,   tokenizer)
+test_dataset  = IDBSectionDataset(test_df,  tokenizer)
+
+print(f"Train sections: {len(train_dataset)} | Val sections: {len(val_dataset)} | Test sections: {len(test_dataset)}")
+for name, ds in [('Train', train_dataset), ('Val', val_dataset), ('Test', test_dataset)]:
+    labels = [ds[i]['label'].item() for i in range(len(ds))]
+    print(f"  {name} label dist: 0={labels.count(0)} no_risk, 1={labels.count(1)} risk")
 
 def identity_collate(batch):
     return batch[0]
@@ -157,12 +161,13 @@ print(classification_report(all_labels, all_preds, target_names=label_names, lab
 print("Confusion Matrix:")
 print(confusion_matrix(all_labels, all_preds, labels=[0, 1]))
 
-# Save per-doc results for t-test (results_table.py reads these)
-doc_ids = [test_dataset.docs[i]['doc_id'] for i in range(len(test_dataset))]
-results_df = pd.DataFrame({'doc_id': doc_ids, 'pred': all_preds, 'true': all_labels})
+# Save per-section results for evaluation (results_table.py reads these)
+doc_ids = [test_dataset[i]['doc_id'] for i in range(len(test_dataset))]
+sec_ids = [test_dataset[i]['section_id'] for i in range(len(test_dataset))]
+results_df = pd.DataFrame({'doc_id': doc_ids, 'section_id': sec_ids, 'pred': all_preds, 'true': all_labels})
 results_df['correct'] = (results_df['pred'] == results_df['true']).astype(int)
 results_df.to_csv(os.path.join(RESULTS, f'{ABLATION_NAME}_doc_results.csv'), index=False)
-print(f"Saved per-doc results to results/{ABLATION_NAME}_doc_results.csv")
+print(f"Saved per-section results to results/{ABLATION_NAME}_doc_results.csv")
 
 # ── Save training curves ──
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
