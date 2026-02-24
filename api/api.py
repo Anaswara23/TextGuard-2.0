@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, HTTPException
+from fastapi import FastAPI, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 import torch
 import torch.nn.functional as F
@@ -183,7 +183,7 @@ def analyze_section(section: dict, sector: str) -> dict:
     }
 
 @app.post("/analyze")
-async def analyze_document(file: UploadFile):
+async def analyze_document(file: UploadFile, sector: str = Form(None)):
     if not file.filename.endswith('.pdf'):
         raise HTTPException(status_code=400, detail="Only PDF files accepted")
     
@@ -201,9 +201,15 @@ async def analyze_document(file: UploadFile):
     if not sections:
         raise HTTPException(status_code=422, detail="Could not parse PDF sections")
 
-    # Detect sector from the first ~1500 chars of all section text combined
-    doc_preview = ' '.join(s['text'] for s in sections)[:1500]
-    sector = detect_sector(doc_preview)
+    # Use caller-supplied sector if valid, otherwise auto-detect
+    valid_sectors = set(POLICY_LABELS_BY_SECTOR.keys())
+    sector_source = "selected"
+    if sector and sector.upper() in valid_sectors:
+        sector = sector.upper()
+    else:
+        doc_preview = ' '.join(s['text'] for s in sections)[:1500]
+        sector = detect_sector(doc_preview)
+        sector_source = "detected"
 
     section_results = [analyze_section(s, sector) for s in sections]
     
@@ -223,6 +229,7 @@ async def analyze_document(file: UploadFile):
         'sections_analyzed': len(section_results),
         'sections_flagged': len(flagged),
         'detected_sector': sector,
+        'sector_source': sector_source,
         'sector_display': SECTOR_DISPLAY.get(sector, sector.replace('_', ' ').title()),
         'policy_labels': all_policy_labels,
         'sections': section_results

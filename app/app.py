@@ -39,10 +39,37 @@ except Exception:
 st.markdown('<p class="main-header">🛡️ TextGuard 2.0</p>', unsafe_allow_html=True)
 st.markdown('<p class="sub-header">Automated risk & compliance triage for IDB project documents · Powered by Hierarchical Attention Networks</p>', unsafe_allow_html=True)
 
+SECTOR_OPTIONS = {
+    "Auto-detect from document": "",
+    "Transport": "TRANSPORT",
+    "Agriculture & Rural Development": "AGRICULTURE_AND_RURAL_DEVELOPMENT",
+    "Education": "EDUCATION",
+    "Energy": "ENERGY",
+    "Environment & Natural Disasters": "ENVIRONMENT_AND_NATURAL_DISASTERS",
+    "Financial Markets": "FINANCIAL_MARKETS",
+    "Health": "HEALTH",
+    "Industry": "INDUSTRY",
+    "Private Firms & SME Development": "PRIVATE_FIRMS_AND_SME_DEVELOPMENT",
+    "Reform & Modernization of the State": "REFORM_MODERNIZATION_OF_THE_STATE",
+    "Regional Integration": "REGIONAL_INTEGRATION",
+    "Science & Technology": "SCIENCE_AND_TECHNOLOGY",
+    "Social Investment": "SOCIAL_INVESTMENT",
+    "Sustainable Tourism": "SUSTAINABLE_TOURISM",
+    "Trade": "TRADE",
+    "Urban Development & Housing": "URBAN_DEVELOPMENT_AND_HOUSING",
+    "Water & Sanitation": "WATER_AND_SANITATION",
+}
+
 col_upload, col_info = st.columns([2, 1])
 
 with col_upload:
     uploaded = st.file_uploader("Upload IDB Project Document (PDF)", type="pdf")
+    sector_choice = st.selectbox(
+        "Project Sector",
+        options=list(SECTOR_OPTIONS.keys()),
+        help="Select the sector to scope policy risk labels, or let TextGuard auto-detect it from the document text."
+    )
+    selected_sector = SECTOR_OPTIONS[sector_choice]
 
 with col_info:
     st.markdown("**What TextGuard analyzes:**")
@@ -53,9 +80,11 @@ with col_info:
 if uploaded:
     with st.spinner(f"Analyzing {uploaded.name}..."):
         try:
+            post_data = {"sector": selected_sector} if selected_sector else {}
             response = requests.post(
                 f"{API_URL}/analyze",
                 files={"file": (uploaded.name, uploaded.getvalue(), "application/pdf")},
+                data=post_data,
                 timeout=120
             )
             response.raise_for_status()
@@ -71,12 +100,8 @@ if uploaded:
 
     sector_display = data.get('sector_display', '')
     if sector_display:
-        st.markdown(
-            f'<span style="background:#1e4d8c;color:#fff;padding:5px 14px;'
-            f'border-radius:14px;font-size:0.85rem;font-weight:600;display:inline-block;'
-            f'margin-bottom:0.5rem">🏷️ Detected Sector: {sector_display}</span>',
-            unsafe_allow_html=True
-        )
+        prefix = "Sector" if sector_choice != "Auto-detect from document" else "Detected Sector"
+        st.badge(f"🏷️ {prefix}: {sector_display}", color="blue")
     st.divider()
     
     col1, col2, col3, col4 = st.columns(4)
