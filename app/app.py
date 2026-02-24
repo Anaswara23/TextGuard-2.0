@@ -4,6 +4,7 @@ import requests
 import pandas as pd
 import json
 import os
+from datetime import datetime
 
 st.set_page_config(
     page_title="TextGuard 2.0",
@@ -14,30 +15,48 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .main-header {font-size: 2.2rem; font-weight: 700;}
-    .sub-header {color: #aaa; font-size: 1rem; margin-bottom: 2rem;}
-    .evidence-box {
-        background: #1e2a3a;
-        border-left: 3px solid #4a90d9;
-        border-radius: 4px;
-        padding: 0.8rem 1rem;
-        font-style: italic;
-        font-size: 0.9rem;
-        color: #d0e4f7;
-        margin-top: 0.5rem;
-        line-height: 1.5;
-    }
+[data-testid="stAppViewContainer"] { background: #0d1117; }
+[data-testid="stHeader"] { background: transparent; }
+.hero-title {
+    font-size: 2.6rem; font-weight: 800; color: #ffffff;
+    text-align: center; margin-top: 2rem; margin-bottom: 0.3rem;
+}
+.hero-sub { font-size: 1rem; color: #8b949e; text-align: center; margin-bottom: 2rem; }
+.section-header {
+    font-size: 1.1rem; font-weight: 600; color: #c9d1d9;
+    margin-bottom: 0.8rem; margin-top: 0.5rem;
+}
+.doc-card {
+    background: #161b22; border: 1px solid #30363d;
+    border-radius: 10px; padding: 1rem 1.1rem 0.9rem;
+}
+.doc-card-title {
+    font-size: 0.82rem; font-weight: 600; color: #e6edf3;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 0.2rem;
+}
+.doc-card-date { font-size: 0.72rem; color: #8b949e; margin-bottom: 0.6rem; }
+.doc-card-stats { display: flex; gap: 1.2rem; margin-top: 0.6rem; }
+.stat-item { font-size: 0.73rem; color: #8b949e; }
+.stat-val  { font-size: 1rem; font-weight: 700; }
+.stat-risk  { color: #f85149; }
+.stat-ok    { color: #3fb950; }
+.stat-score { color: #d29922; }
+.risk-badge-high   { background:#3d1212; color:#f85149; border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
+.risk-badge-medium { background:#3d2e00; color:#d29922; border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
+.risk-badge-low    { background:#0d3321; color:#3fb950; border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
+.evidence-box {
+    background: #1e2a3a; border-left: 3px solid #4a90d9; border-radius: 4px;
+    padding: 0.8rem 1rem; font-style: italic; font-size: 0.9rem;
+    color: #d0e4f7; margin-top: 0.5rem; line-height: 1.5;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Use Streamlit secrets (Streamlit Cloud) → env var → localhost fallback
+# ── Config ─────────────────────────────────────────────────────────────────────
 try:
     API_URL = st.secrets["app"]["API_URL"]
 except Exception:
     API_URL = os.environ.get("API_URL", "http://localhost:8000")
-
-st.markdown('<p class="main-header">🛡️ TextGuard 2.0</p>', unsafe_allow_html=True)
-st.markdown('<p class="sub-header">Automated risk & compliance triage for IDB project documents · Powered by Hierarchical Attention Networks</p>', unsafe_allow_html=True)
 
 SECTOR_OPTIONS = {
     "Auto-detect from document": "",
@@ -60,25 +79,38 @@ SECTOR_OPTIONS = {
     "Water & Sanitation": "WATER_AND_SANITATION",
 }
 
-col_upload, col_info = st.columns([2, 1])
+# ── Session state ──────────────────────────────────────────────────────────────
+if "history" not in st.session_state:
+    st.session_state.history = []
+if "active_result" not in st.session_state:
+    st.session_state.active_result = None
+if "active_filename" not in st.session_state:
+    st.session_state.active_filename = None
 
-with col_upload:
-    uploaded = st.file_uploader("Upload IDB Project Document (PDF)", type="pdf")
-    sector_choice = st.selectbox(
-        "Project Sector",
-        options=list(SECTOR_OPTIONS.keys()),
-        help="Select the sector to scope policy risk labels, or let TextGuard auto-detect it from the document text."
-    )
+# ── Hero ───────────────────────────────────────────────────────────────────────
+st.markdown('<div class="hero-title">🛡️ TextGuard 2.0</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-sub">Automated risk &amp; compliance auditor for IDB project documents<br>'
+    'Upload a PDF, select the sector, and get section-level risk scores powered by Hierarchical Attention Networks.</div>',
+    unsafe_allow_html=True
+)
+
+# ── Upload panel ───────────────────────────────────────────────────────────────
+up_col, sec_col, btn_col = st.columns([3, 2, 1])
+with up_col:
+    uploaded = st.file_uploader("Upload PDF", type="pdf", label_visibility="collapsed")
+with sec_col:
+    sector_choice = st.selectbox("Sector", options=list(SECTOR_OPTIONS.keys()), label_visibility="collapsed")
+with btn_col:
+    analyze_clicked = st.button("Analyze →", disabled=uploaded is None,
+                                use_container_width=True, type="primary")
+
+st.markdown("<div style='margin-bottom:1.5rem'></div>", unsafe_allow_html=True)
+
+# ── Run analysis ───────────────────────────────────────────────────────────────
+if uploaded and analyze_clicked:
     selected_sector = SECTOR_OPTIONS[sector_choice]
-
-with col_info:
-    st.markdown("**What TextGuard analyzes:**")
-    st.markdown("- Risk signals in each section")
-    st.markdown("- Compliance with IDB policy requirements")
-    st.markdown("- Which specific text triggered each flag")
-
-if uploaded:
-    with st.spinner(f"Analyzing {uploaded.name}..."):
+    with st.spinner(f"Analyzing {uploaded.name} …"):
         try:
             post_data = {"sector": selected_sector} if selected_sector else {}
             response = requests.post(
@@ -95,126 +127,167 @@ if uploaded:
         except Exception as e:
             st.error(f"Analysis failed: {str(e)}")
             st.stop()
-    
-    st.success(f"Analysis complete — {data['sections_analyzed']} sections analyzed")
 
-    sector_display = data.get('sector_display', '')
-    if sector_display:
-        prefix = "Sector" if sector_choice != "Auto-detect from document" else "Detected Sector"
-        st.badge(f"🏷️ {prefix}: {sector_display}", color="blue")
+    st.session_state.history = [h for h in st.session_state.history if h["filename"] != uploaded.name]
+    st.session_state.history.insert(0, {
+        "filename": uploaded.name,
+        "date": datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p"),
+        "data": data,
+    })
+    st.session_state.active_result = data
+    st.session_state.active_filename = uploaded.name
+    st.rerun()
+
+# ── History grid ───────────────────────────────────────────────────────────────
+if st.session_state.history:
+    st.markdown('<div class="section-header">Previously Analyzed Documents</div>', unsafe_allow_html=True)
+    COLS = 5
+    for row_start in range(0, len(st.session_state.history), COLS):
+        row_entries = st.session_state.history[row_start:row_start + COLS]
+        grid = st.columns(COLS)
+        for col, entry in zip(grid, row_entries):
+            d = entry["data"]
+            risk = d["overall_risk"]
+            n_risk = d["sections_flagged"]
+            n_ok = d["sections_analyzed"] - d["sections_flagged"]
+            badge_cls = "risk-badge-high" if risk > 70 else "risk-badge-medium" if risk > 40 else "risk-badge-low"
+            badge_lbl = "High Risk" if risk > 70 else "Medium Risk" if risk > 40 else "Low Risk"
+            fname_short = entry["filename"][:26] + "…" if len(entry["filename"]) > 26 else entry["filename"]
+            active_border = "#58a6ff" if entry["filename"] == st.session_state.active_filename else "#30363d"
+
+            with col:
+                st.markdown(f"""
+                <div class="doc-card" style="border-color:{active_border}">
+                    <div class="doc-card-title" title="{entry['filename']}">{fname_short}</div>
+                    <div class="doc-card-date">{entry['date']}</div>
+                    <span class="{badge_cls}">{badge_lbl}</span>
+                    <div class="doc-card-stats">
+                        <div class="stat-item">Risk<br><span class="stat-val stat-risk">{n_risk}</span></div>
+                        <div class="stat-item">No risk<br><span class="stat-val stat-ok">{n_ok}</span></div>
+                        <div class="stat-item">Risk score<br><span class="stat-val stat-score">{risk}%</span></div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("View →", key=f"view_{entry['filename']}", use_container_width=True):
+                    st.session_state.active_result = entry["data"]
+                    st.session_state.active_filename = entry["filename"]
+                    st.rerun()
+
+# ── Result detail ──────────────────────────────────────────────────────────────
+data = st.session_state.active_result
+filename = st.session_state.active_filename
+
+if data:
     st.divider()
-    
-    col1, col2, col3, col4 = st.columns(4)
-    risk = data['overall_risk']
-    status_text = "High Risk" if risk > 70 else "Medium Risk" if risk > 40 else "Low Risk"
-    col1.metric("Overall Risk Score", f"{risk}%", status_text)
-    col2.metric("Compliance Status", data['overall_compliance'])
-    col3.metric("Sections Flagged", f"{data['sections_flagged']} / {data['sections_analyzed']}")
-    col4.metric("Document", uploaded.name[:25] + "..." if len(uploaded.name) > 25 else uploaded.name)
-    
+    risk = data["overall_risk"]
+
+    hcol1, hcol2 = st.columns([5, 1])
+    with hcol1:
+        st.subheader(f"📄 {filename}")
+        sector_display = data.get("sector_display", "")
+        if sector_display:
+            prefix = "Detected Sector" if data.get("sector_source") == "detected" else "Sector"
+            st.badge(f"🏷️ {prefix}: {sector_display}", color="blue")
+    with hcol2:
+        st.download_button(
+            "📥 Download Report",
+            data=json.dumps(data, indent=2),
+            file_name=f"textguard_{filename.replace('.pdf','')}.json",
+            mime="application/json",
+            use_container_width=True,
+        )
+
+    mc1, mc2, mc3, mc4 = st.columns(4)
+    mc1.metric("Overall Risk Score", f"{risk}%",
+               "High Risk" if risk > 70 else "Medium Risk" if risk > 40 else "Low Risk")
+    mc2.metric("Compliance Status", data["overall_compliance"])
+    mc3.metric("Sections Flagged", f"{data['sections_flagged']} / {data['sections_analyzed']}")
+    mc4.metric("Sector", sector_display or "—")
+
     st.divider()
     col_gauge, col_breakdown = st.columns([1, 2])
-    
+
     with col_gauge:
         gauge_color = "crimson" if risk > 70 else "orange" if risk > 40 else "green"
         fig = go.Figure(go.Indicator(
-            mode="gauge+number+delta",
+            mode="gauge+number",
             value=risk,
-            title={'text': "Document Risk Score", 'font': {'size': 14}},
-            number={'suffix': "%"},
+            title={"text": "Document Risk Score", "font": {"size": 13}},
+            number={"suffix": "%"},
             gauge={
-                'axis': {'range': [0, 100]},
-                'bar': {'color': gauge_color},
-                'steps': [
-                    {'range': [0, 40],  'color': "#d4edda"},
-                    {'range': [40, 70], 'color': "#fff3cd"},
-                    {'range': [70, 100],'color': "#f8d7da"}
+                "axis": {"range": [0, 100]},
+                "bar": {"color": gauge_color},
+                "steps": [
+                    {"range": [0, 40],   "color": "#0d3321"},
+                    {"range": [40, 70],  "color": "#3d2e00"},
+                    {"range": [70, 100], "color": "#3d1212"},
                 ],
             }
         ))
-        fig.update_layout(height=280, margin=dict(t=40, b=20, l=20, r=20),
-                          template="plotly_dark",
-                          paper_bgcolor="rgba(0,0,0,0)")
+        fig.update_layout(height=260, margin=dict(t=40, b=10, l=20, r=20),
+                          template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)")
         st.plotly_chart(fig, use_container_width=True)
-        
-        policy_labels = data.get('policy_labels', [])
+
+        policy_labels = data.get("policy_labels", [])
         if policy_labels:
             st.markdown("**Policy Risk Labels:**")
-            tags_html = " ".join(
-                f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 10px;'
-                f'border-radius:10px;font-size:0.8rem;margin:2px;display:inline-block">'
-                f'{lbl}</span>'
+            tags = " ".join(
+                f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 9px;'
+                f'border-radius:8px;font-size:0.78rem;margin:2px;display:inline-block">{lbl}</span>'
                 for lbl in policy_labels
             )
-            st.markdown(tags_html, unsafe_allow_html=True)
-    
+            st.markdown(tags, unsafe_allow_html=True)
+
     with col_breakdown:
         st.subheader("Section Risk Breakdown")
-        sections = sorted(data['sections'], key=lambda x: -x['risk_score'])
-        for s in sections:
-            icon = "🔴" if s['risk_score'] > 70 else "🟡" if s['risk_score'] > 40 else "🟢"
-            st.markdown(f"{icon} **{s['section']}** — {s['risk_score']}% risk | {s['compliance']}")
-            st.progress(s['risk_score'] / 100)
-    
+        for s in sorted(data["sections"], key=lambda x: -x["risk_score"]):
+            icon = "🔴" if s["risk_score"] > 70 else "🟡" if s["risk_score"] > 40 else "🟢"
+            st.markdown(f"{icon} **{s['section']}** — {s['risk_score']}% | {s['compliance']}")
+            st.progress(s["risk_score"] / 100)
+
     st.divider()
-    flagged_sections = [s for s in data['sections'] if s['risk_score'] > 40]
-    
-    if flagged_sections:
-        st.subheader(f"⚠️ Flagged Sections — Evidence ({len(flagged_sections)} sections)")
-        for s in sorted(flagged_sections, key=lambda x: -x['risk_score']):
+    flagged = [s for s in data["sections"] if s["risk_score"] > 40]
+    if flagged:
+        st.subheader(f"⚠️ Flagged Sections ({len(flagged)})")
+        for s in sorted(flagged, key=lambda x: -x["risk_score"]):
             with st.expander(f"**{s['section']}** — {s['risk_score']}% risk | {s['compliance']}"):
                 st.markdown("**Key Evidence** *(highest-attention chunk)*:")
                 st.markdown(f'<div class="evidence-box">"{s["evidence"]}"</div>', unsafe_allow_html=True)
 
-                section_labels = s.get('policy_labels', [])
+                section_labels = s.get("policy_labels", [])
                 if section_labels:
                     st.markdown("**Policy Risk Labels:**")
-                    tags_html = " ".join(
-                        f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 10px;'
-                        f'border-radius:10px;font-size:0.8rem;margin:2px;display:inline-block">'
-                        f'{lbl}</span>'
+                    tags = " ".join(
+                        f'<span style="background:#1a3a5c;color:#7eb8f7;padding:3px 9px;'
+                        f'border-radius:8px;font-size:0.78rem;margin:2px;display:inline-block">{lbl}</span>'
                         for lbl in section_labels
                     )
-                    st.markdown(tags_html, unsafe_allow_html=True)
+                    st.markdown(tags, unsafe_allow_html=True)
 
-                if len(s['attention_weights']) > 1:
-                    weights_df = pd.DataFrame({
-                        'Chunk': [f"Chunk {i}" for i in range(len(s['attention_weights']))],
-                        'Attention': s['attention_weights']
-                    })
+                if len(s["attention_weights"]) > 1:
                     fig_attn = go.Figure(go.Bar(
-                        x=weights_df['Chunk'],
-                        y=weights_df['Attention'],
-                        marker_color=['#e74c3c' if w == max(s['attention_weights']) else '#4a90d9'
-                                     for w in s['attention_weights']],
-                        hovertemplate='%{x}: %{y:.4f}<extra></extra>'
+                        x=[f"Chunk {i}" for i in range(len(s["attention_weights"]))],
+                        y=s["attention_weights"],
+                        marker_color=[
+                            "#e74c3c" if w == max(s["attention_weights"]) else "#4a90d9"
+                            for w in s["attention_weights"]
+                        ],
+                        hovertemplate="%{x}: %{y:.4f}<extra></extra>"
                     ))
                     fig_attn.update_layout(
-                        title="Chunk Attention Weights",
-                        height=240,
-                        template="plotly_dark",
-                        paper_bgcolor="rgba(0,0,0,0)",
+                        title="Chunk Attention Weights", height=220,
+                        template="plotly_dark", paper_bgcolor="rgba(0,0,0,0)",
                         plot_bgcolor="rgba(0,0,0,0)",
-                        margin=dict(t=35, b=20, l=20, r=20),
-                        font=dict(color="#ccc")
+                        margin=dict(t=35, b=15, l=15, r=15), font=dict(color="#ccc")
                     )
                     st.plotly_chart(fig_attn, use_container_width=True)
     else:
-        st.success("✅ No high-risk sections detected. Document appears compliant.")
-    
-    report_json = json.dumps(data, indent=2)
-    st.download_button(
-        label="📥 Download Full Report (JSON)",
-        data=report_json,
-        file_name=f"textguard_report_{uploaded.name.replace('.pdf', '')}.json",
-        mime="application/json"
-    )
+        st.success("✅ No high-risk sections detected.")
 
 else:
-    st.info("👆 Upload an IDB project PDF to begin analysis")
-    st.markdown("---")
-    col_a, col_b, col_c, col_d = st.columns(4)
-    col_a.markdown("**1. Parse**\nPDF → sections")
-    col_b.markdown("**2. Encode**\nBERT encodes chunks")
-    col_c.markdown("**3. Attend**\nAttention weighs chunks")
-    col_d.markdown("**4. Score**\nRisk + compliance scores")
+    st.markdown("""
+    <div style="text-align:center;padding:3rem 0;color:#8b949e">
+        <div style="font-size:2.5rem">📂</div>
+        <div style="margin-top:0.5rem">Upload a document and click <strong>Analyze →</strong> to get started</div>
+    </div>
+    """, unsafe_allow_html=True)
